@@ -25,7 +25,7 @@ export interface FinancialData {
 
 export const mockUser: User = {
   id: '1',
-  name: 'John Doe',
+  name: 'Aditya Magar',
   email: 'john@example.com'
 };
 
