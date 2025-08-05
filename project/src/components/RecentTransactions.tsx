@@ -1,69 +1,76 @@
 import React from 'react';
-import * as Icons from 'lucide-react';
-import { Transaction } from '../types';
-import { format } from 'date-fns';
+import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { Transaction } from '../types/User';
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
 }
 
 const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions }) => {
-  const formatAmount = (amount: number, type: 'income' | 'expense') => {
-    const formatted = new Intl.NumberFormat('en-IN', {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 0,
     }).format(amount);
-    
-    return type === 'income' ? `+${formatted}` : `-${formatted}`;
   };
 
-  const getIcon = (iconName: string) => {
-    const IconComponent = (Icons as any)[iconName] || Icons.DollarSign;
-    return IconComponent;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-lg">
+    <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
-        <button className="text-teal-600 hover:text-teal-700 text-sm font-medium">
+        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
           View All
         </button>
       </div>
-      
-      <div className="space-y-4 max-h-96 overflow-y-auto">
-        {transactions.slice(0, 8).map((transaction) => {
-          const IconComponent = getIcon(transaction.icon);
-          
-          return (
-            <div key={transaction.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-xl transition-colors duration-200">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                transaction.type === 'income' 
-                  ? 'bg-green-100 text-green-600' 
-                  : 'bg-red-100 text-red-600'
-              }`}>
-                <IconComponent className="w-5 h-5" />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{transaction.category}</p>
-                <p className="text-sm text-gray-500 truncate">{transaction.description}</p>
-              </div>
-              
-              <div className="text-right">
-                <p className={`font-semibold ${
-                  transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {formatAmount(transaction.amount, transaction.type)}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {format(new Date(transaction.date), 'MMM dd')}
-                </p>
+
+      <div className="space-y-4">
+        {transactions.slice(0, 6).map((transaction, index) => (
+          <div
+            key={transaction.id}
+            className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <div className={`p-2 rounded-lg ${
+              transaction.type === 'income' 
+                ? 'bg-green-100' 
+                : 'bg-red-100'
+            }`}>
+              {transaction.type === 'income' ? (
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              ) : (
+                <TrendingDown className="w-5 h-5 text-red-600" />
+              )}
+            </div>
+
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{transaction.category}</p>
+                  <p className="text-sm text-gray-500">{transaction.description}</p>
+                </div>
+                <div className="text-right">
+                  <p className={`font-semibold ${
+                    transaction.type === 'income' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  </p>
+                  <div className="flex items-center space-x-1 text-gray-400">
+                    <Calendar className="w-3 h-3" />
+                    <span className="text-xs">{formatDate(transaction.date)}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );

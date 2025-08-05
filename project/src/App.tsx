@@ -1,114 +1,57 @@
-import React from 'react';
-import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AppProvider } from './context/AppContext';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import Toast from './components/Toast';
-import ProtectedRoute from './components/ProtectedRoute';
-import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import Income from './pages/Income';
-import Expense from './pages/Expense';
-import Filter from './pages/Filter';
-import Report from './pages/Report';
+import React, { useState } from 'react';
+import LandingPage from './components/LandingPage';
+import AuthPage from './components/AuthPage';
+import Dashboard from './components/Dashboard';
+import IncomePage from './components/IncomePage';
+import ExpensePage from './components/ExpensePage';
+import ReportsPage from './components/ReportsPage';
+import FilterPage from './components/FilterPage';
+import AIReportPage from './components/AIReportPage';
+import { User, mockUser } from './types/User';
+
+export type AppPage = 'landing' | 'auth' | 'dashboard' | 'income' | 'expense' | 'reports' | 'filter' | 'ai-report';
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<AppPage>('landing');
+  const [user, setUser] = useState<User | null>(null);
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
+  const handleLogin = (userData: User) => {
+    setUser(userData);
+    setCurrentPage('dashboard');
   };
 
-  const closeSidebar = () => {
-    setSidebarOpen(false);
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentPage('landing');
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'landing':
+        return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
+      case 'auth':
+        return <AuthPage onLogin={handleLogin} onBack={() => setCurrentPage('landing')} />;
+      case 'dashboard':
+        return <Dashboard user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      case 'income':
+        return <IncomePage user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      case 'expense':
+        return <ExpensePage user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      case 'reports':
+        return <ReportsPage user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      case 'filter':
+        return <FilterPage user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      case 'ai-report':
+        return <AIReportPage user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
+      default:
+        return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
+    }
   };
 
   return (
-    <AppProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Navbar onMenuClick={toggleSidebar} />
-          
-          <div className="flex">
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute>
-                    <div className="flex w-full">
-                      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-                      <div className="flex-1 lg:ml-64">
-                        <Dashboard />
-                      </div>
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/income" 
-                element={
-                  <ProtectedRoute>
-                    <div className="flex w-full">
-                      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-                      <div className="flex-1 lg:ml-64">
-                        <Income />
-                      </div>
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/expense" 
-                element={
-                  <ProtectedRoute>
-                    <div className="flex w-full">
-                      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-                      <div className="flex-1 lg:ml-64">
-                        <Expense />
-                      </div>
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/filter" 
-                element={
-                  <ProtectedRoute>
-                    <div className="flex w-full">
-                      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-                      <div className="flex-1 lg:ml-64">
-                        <Filter />
-                      </div>
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/report" 
-                element={
-                  <ProtectedRoute>
-                    <div className="flex w-full">
-                      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-                      <div className="flex-1 lg:ml-64">
-                        <Report />
-                      </div>
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-            </Routes>
-          </div>
-          
-          <Toast />
-        </div>
-      </Router>
-    </AppProvider>
+    <div className="min-h-screen bg-gray-50">
+      {renderPage()}
+    </div>
   );
 }
 
