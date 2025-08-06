@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import SlidingPanel from './SlidingPanel';
-import { User, mockFinancialData, Transaction } from '../types/User';
+import { User } from '../types/User';
 import { AppPage } from '../App';
 import { Filter, Calendar, DollarSign, Tag, Search, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
+import { authService } from '../services/authService';
+import LoadingSpinner from './LoadingSpinner';
 
 interface FilterPageProps {
   user: User | null;
@@ -22,47 +24,60 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
     amountMax: '',
     searchTerm: ''
   });
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>(mockFinancialData.transactions);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [income, expenses] = await Promise.all([
+          authService.getIncome(),
+          authService.getExpenses()
+        ]);
+        const incomeTx = income.map((t: any) => ({ ...t, type: 'income' }));
+        const expenseTx = expenses.map((t: any) => ({ ...t, type: 'expense' }));
+        const all = [...incomeTx, ...expenseTx].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setAllTransactions(all);
+        setFilteredTransactions(all);
+      } catch (e) {
+        setAllTransactions([]);
+        setFilteredTransactions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const applyFilters = () => {
-    let filtered = mockFinancialData.transactions;
-
-    // Filter by type
+    let filtered = allTransactions;
     if (filters.type !== 'all') {
       filtered = filtered.filter(t => t.type === filters.type);
     }
-
-    // Filter by category
     if (filters.category !== 'all') {
       filtered = filtered.filter(t => t.category === filters.category);
     }
-
-    // Filter by date range
     if (filters.dateFrom) {
       filtered = filtered.filter(t => new Date(t.date) >= new Date(filters.dateFrom));
     }
     if (filters.dateTo) {
       filtered = filtered.filter(t => new Date(t.date) <= new Date(filters.dateTo));
     }
-
-    // Filter by amount range
     if (filters.amountMin) {
       filtered = filtered.filter(t => t.amount >= parseFloat(filters.amountMin));
     }
     if (filters.amountMax) {
       filtered = filtered.filter(t => t.amount <= parseFloat(filters.amountMax));
     }
-
-    // Filter by search term
     if (filters.searchTerm) {
       const searchTerm = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(t => 
         t.category.toLowerCase().includes(searchTerm) ||
-        t.description.toLowerCase().includes(searchTerm)
+        (t.description && t.description.toLowerCase().includes(searchTerm))
       );
     }
-
     setFilteredTransactions(filtered);
   };
 
@@ -76,7 +91,7 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
       amountMax: '',
       searchTerm: ''
     });
-    setFilteredTransactions(mockFinancialData.transactions);
+    setFilteredTransactions(allTransactions);
   };
 
   const formatCurrency = (amount: number) => {
@@ -96,11 +111,15 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
   };
 
   // Get unique categories
-  const allCategories = [...new Set(mockFinancialData.transactions.map(t => t.category))];
+  const allCategories = [...new Set(allTransactions.map(t => t.category))];
 
   // Calculate filtered totals
   const filteredIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
   const filteredExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner text="Loading..." /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -109,14 +128,12 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
         onMenuClick={() => setIsPanelOpen(true)} 
         onLogout={onLogout}
       />
-      
       <SlidingPanel 
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         onNavigate={onNavigate}
         currentPage="filter"
       />
-
       <div className="pt-16 px-4 pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -124,7 +141,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Filter & Search</h1>
             <p className="text-gray-600">Filter transactions by various criteria to find what you need</p>
           </div>
-
           <div className="grid lg:grid-cols-4 gap-8">
             {/* Filters Sidebar */}
             <div className="lg:col-span-1">
@@ -142,7 +158,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                     <span>Reset</span>
                   </button>
                 </div>
-
                 <div className="space-y-6">
                   {/* Search */}
                   <div>
@@ -158,7 +173,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                       />
                     </div>
                   </div>
-
                   {/* Type Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
@@ -172,7 +186,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                       <option value="expense">Expense</option>
                     </select>
                   </div>
-
                   {/* Category Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
@@ -187,7 +200,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                       ))}
                     </select>
                   </div>
-
                   {/* Date Range */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
@@ -208,7 +220,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                       />
                     </div>
                   </div>
-
                   {/* Amount Range */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Amount Range</label>
@@ -229,7 +240,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                       />
                     </div>
                   </div>
-
                   <button
                     onClick={applyFilters}
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all"
@@ -239,7 +249,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                 </div>
               </div>
             </div>
-
             {/* Results */}
             <div className="lg:col-span-3">
               {/* Summary Cards */}
@@ -252,9 +261,8 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                     <h3 className="font-semibold text-gray-900">Filtered Results</h3>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">{filteredTransactions.length}</p>
-                  <p className="text-sm text-gray-500">out of {mockFinancialData.transactions.length} total</p>
+                  <p className="text-sm text-gray-500">out of {allTransactions.length} total</p>
                 </div>
-
                 <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="p-2 bg-green-100 rounded-lg">
@@ -264,7 +272,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                   </div>
                   <p className="text-2xl font-bold text-green-600">{formatCurrency(filteredIncome)}</p>
                 </div>
-
                 <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="p-2 bg-red-100 rounded-lg">
@@ -275,13 +282,11 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                   <p className="text-2xl font-bold text-red-600">{formatCurrency(filteredExpense)}</p>
                 </div>
               </div>
-
               {/* Filtered Transactions */}
               <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">
                   Filtered Transactions ({filteredTransactions.length})
                 </h3>
-
                 {filteredTransactions.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -294,7 +299,7 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                   <div className="space-y-4">
                     {filteredTransactions.map((transaction, index) => (
                       <div
-                        key={transaction.id}
+                        key={transaction._id || index}
                         className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
@@ -307,7 +312,6 @@ const FilterPage: React.FC<FilterPageProps> = ({ user, onNavigate, onLogout }) =
                             <TrendingDown className="w-6 h-6 text-red-600" />
                           )}
                         </div>
-
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <div>

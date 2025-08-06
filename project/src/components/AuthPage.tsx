@@ -1,26 +1,72 @@
 import React, { useState } from 'react';
 import { TrendingUp, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from 'lucide-react';
-import { mockUser } from '../types/User';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import LoadingSpinner from './LoadingSpinner';
 
 interface AuthPageProps {
-  onLogin: (user: any) => void;
   onBack: () => void;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
+const AuthPage: React.FC<AuthPageProps> = ({ onBack }) => {
+  const { login, signup, loading } = useAuth();
+  const { showToast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+
+    if (!isLogin && !formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - in real app, this would validate against backend
-    onLogin(mockUser);
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      if (isLogin) {
+        await login(formData.email, formData.password);
+        showToast('success', 'Successfully logged in!');
+      } else {
+        await signup(formData.name, formData.email, formData.password);
+        showToast('success', 'Account created successfully!');
+      }
+    } catch (error: any) {
+      showToast('error', error.message || 'Authentication failed');
+    }
   };
 
   return (
@@ -65,11 +111,16 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      errors.name ? 'border-red-500' : 'border-gray-200'
+                    }`}
                     placeholder="Enter your name"
                     required={!isLogin}
                   />
                 </div>
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                )}
               </div>
             )}
 
@@ -81,11 +132,16 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                    errors.email ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   placeholder="Enter your email"
                   required
                 />
               </div>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -96,7 +152,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                    errors.password ? 'border-red-500' : 'border-gray-200'
+                  }`}
                   placeholder="Enter your password"
                   required
                 />
@@ -108,6 +166,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              )}
             </div>
 
             {!isLogin && (
@@ -116,14 +177,26 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                      errors.confirmPassword ? 'border-red-500' : 'border-gray-200'
+                    }`}
                     placeholder="Confirm your password"
                     required={!isLogin}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
                 </div>
+                {errors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                )}
               </div>
             )}
 
@@ -141,9 +214,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLogin, onBack }) => {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:cursor-not-allowed disabled:transform-none"
             >
-              {isLogin ? 'Sign In' : 'Create Account'}
+              {loading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <LoadingSpinner size="small" color="text-white" />
+                  <span>{isLogin ? 'Signing In...' : 'Creating Account...'}</span>
+                </div>
+              ) : (
+                <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+              )}
             </button>
           </form>
 

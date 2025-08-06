@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import Navbar from './Navbar';
 import SlidingPanel from './SlidingPanel';
-import { User, mockFinancialData } from '../types/User';
+import { User } from '../types/User';
 import { AppPage } from '../App';
-import { Brain, TrendingUp, TrendingDown, AlertTriangle, Target, Lightbulb, Star, ArrowRight } from 'lucide-react';
+import { Brain } from 'lucide-react';
+import { authService } from '../services/authService';
+import LoadingSpinner from './LoadingSpinner';
 
 interface AIReportPageProps {
   user: User | null;
@@ -11,9 +13,14 @@ interface AIReportPageProps {
   onLogout: () => void;
 }
 
+const GEMINI_API_KEY = 'DUMMY_GEMINI_API_KEY';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+
 const AIReportPage: React.FC<AIReportPageProps> = ({ user, onNavigate, onLogout }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiReport, setAIReport] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -23,93 +30,40 @@ const AIReportPage: React.FC<AIReportPageProps> = ({ user, onNavigate, onLogout 
     }).format(amount);
   };
 
-  const generateReport = () => {
+  const generateReport = async () => {
     setIsGenerating(true);
-    // Simulate AI processing
-    setTimeout(() => {
+    setError(null);
+    setAIReport(null);
+    try {
+      // Fetch real data
+      const [income, expenses] = await Promise.all([
+        authService.getIncome(),
+        authService.getExpenses()
+      ]);
+      // Prepare summary
+      const totalIncome = income.reduce((sum, t) => sum + (t.amount || 0), 0);
+      const totalExpense = expenses.reduce((sum, t) => sum + (t.amount || 0), 0);
+      const balance = totalIncome - totalExpense;
+      // Prepare prompt
+      const prompt = `You are a financial advisor AI. Analyze the following user's financial data and provide a detailed, actionable report with insights, warnings, and recommendations.\n\nIncome Records: ${JSON.stringify(income)}\n\nExpense Records: ${JSON.stringify(expenses)}\n\nSummary: Total Income: ${formatCurrency(totalIncome)}, Total Expense: ${formatCurrency(totalExpense)}, Net Balance: ${formatCurrency(balance)}.\n\nPlease include:\n- Key insights (positive, warning, neutral)\n- Spending patterns\n- Savings rate\n- Suggestions for improvement\n- Any risks or opportunities\n- Use clear, friendly language and bullet points where helpful.`;
+      // Call Gemini API
+      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await response.json();
+      if (data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+        setAIReport(data.candidates[0].content.parts.map((p: any) => p.text).join('\n'));
+      } else {
+        setError('Failed to generate report. Please try again.');
+      }
+    } catch (e) {
+      setError('Failed to generate report. Please try again.');
+    } finally {
       setIsGenerating(false);
-    }, 2000);
+    }
   };
-
-  // Mock AI insights
-  const insights = [
-    {
-      type: 'positive',
-      icon: TrendingUp,
-      title: 'Excellent Savings Rate',
-      description: 'Your savings rate of 53.8% is significantly above the recommended 20%. This puts you on track for strong financial security.',
-      recommendation: 'Consider investing a portion of your savings in diversified portfolios for better long-term growth.'
-    },
-    {
-      type: 'warning',
-      icon: AlertTriangle,
-      title: 'Entertainment Spending Spike',
-      description: 'Your entertainment expenses have increased by 45% compared to last month, totaling ₹8,000.',
-      recommendation: 'Set a monthly entertainment budget of ₹6,000 to maintain your excellent savings rate.'
-    },
-    {
-      type: 'neutral',
-      icon: Target,
-      title: 'Consistent Income Pattern',
-      description: 'Your income shows steady growth with multiple sources including salary, freelance, and investments.',
-      recommendation: 'Continue diversifying income streams. Consider increasing freelance rates by 10-15%.'
-    }
-  ];
-
-  const predictions = [
-    {
-      metric: 'Next Month Expenses',
-      value: '₹42,000',
-      trend: 'up',
-      confidence: 85,
-      description: 'Based on seasonal patterns and current spending trends'
-    },
-    {
-      metric: 'Year-end Savings',
-      value: '₹5,40,000',
-      trend: 'up',
-      confidence: 92,
-      description: 'Projected savings if current patterns continue'
-    },
-    {
-      metric: 'Budget Variance',
-      value: '-8%',
-      trend: 'neutral',
-      confidence: 78,
-      description: 'Expected difference from your planned budget'
-    }
-  ];
-
-  const recommendations = [
-    {
-      category: 'Savings',
-      title: 'Emergency Fund Complete',
-      description: 'You have 6+ months of expenses saved. Consider investing excess in mutual funds.',
-      priority: 'high',
-      impact: 'High return potential'
-    },
-    {
-      category: 'Expenses',
-      title: 'Optimize Subscription Services',
-      description: 'Review recurring subscriptions. Potential savings of ₹2,000/month identified.',
-      priority: 'medium',
-      impact: 'Monthly savings'
-    },
-    {
-      category: 'Income',
-      title: 'Freelance Rate Optimization',
-      description: 'Market analysis suggests you can increase freelance rates by 20%.',
-      priority: 'high',
-      impact: 'Income boost'
-    },
-    {
-      category: 'Investment',
-      title: 'Tax-saving Instruments',
-      description: 'Maximize 80C deductions with ELSS investments before March.',
-      priority: 'medium',
-      impact: 'Tax savings'
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -118,16 +72,14 @@ const AIReportPage: React.FC<AIReportPageProps> = ({ user, onNavigate, onLogout 
         onMenuClick={() => setIsPanelOpen(true)} 
         onLogout={onLogout}
       />
-      
       <SlidingPanel 
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         onNavigate={onNavigate}
         currentPage="ai-report"
       />
-
       <div className="pt-16 px-4 pb-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -145,160 +97,33 @@ const AIReportPage: React.FC<AIReportPageProps> = ({ user, onNavigate, onLogout 
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all flex items-center space-x-2"
             >
               <Brain className="w-5 h-5" />
-              <span>{isGenerating ? 'Generating...' : 'Regenerate Report'}</span>
+              <span>{isGenerating ? 'Generating...' : aiReport ? 'Regenerate Report' : 'Generate Report'}</span>
             </button>
           </div>
-
-          {/* AI Insights */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Key Insights</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {insights.map((insight, index) => {
-                const Icon = insight.icon;
-                const colors = {
-                  positive: 'from-green-500 to-green-600 text-green-600 bg-green-50',
-                  warning: 'from-yellow-500 to-yellow-600 text-yellow-600 bg-yellow-50',
-                  neutral: 'from-blue-500 to-blue-600 text-blue-600 bg-blue-50'
-                };
-
-                return (
-                  <div
-                    key={index}
-                    className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all"
-                    style={{ animationDelay: `${index * 200}ms` }}
-                  >
-                    <div className={`inline-flex p-3 rounded-xl mb-4 bg-gradient-to-r ${colors[insight.type].split(' ')[0]} ${colors[insight.type].split(' ')[1]}`}>
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{insight.title}</h3>
-                    <p className="text-gray-600 mb-4 text-sm leading-relaxed">{insight.description}</p>
-                    <div className={`p-3 rounded-lg ${colors[insight.type].split(' ').slice(2).join(' ')}`}>
-                      <p className={`text-sm font-medium ${colors[insight.type].split(' ')[2]}`}>
-                        💡 {insight.recommendation}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Loader */}
+          {isGenerating && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <LoadingSpinner size="large" text="Generating your AI report..." />
+              <p className="text-gray-500 mt-4">This may take a few seconds...</p>
             </div>
-          </div>
-
-          {/* Predictions */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Predictions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {predictions.map((prediction, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
-                  style={{ animationDelay: `${index * 150}ms` }}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-gray-900">{prediction.metric}</h3>
-                    <div className="flex items-center space-x-1">
-                      <div className={`w-2 h-2 rounded-full ${prediction.trend === 'up' ? 'bg-green-500' : prediction.trend === 'down' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
-                      <span className="text-xs text-gray-500">{prediction.confidence}% confident</span>
-                    </div>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900 mb-2">{prediction.value}</p>
-                  <p className="text-sm text-gray-500">{prediction.description}</p>
-                  <div className="mt-4">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-1000"
-                        style={{ width: `${prediction.confidence}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+          )}
+          {/* Error */}
+          {error && (
+            <div className="bg-red-100 text-red-700 rounded-lg p-4 mb-6 text-center font-medium">{error}</div>
+          )}
+          {/* AI Report */}
+          {aiReport && !isGenerating && (
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 mb-8 animate-fade-in">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">AI-Generated Financial Report</h2>
+              <pre className="whitespace-pre-wrap text-gray-800 text-base leading-relaxed">{aiReport}</pre>
             </div>
-          </div>
-
-          {/* Recommendations */}
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Personalized Recommendations</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {recommendations.map((rec, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all group"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        rec.priority === 'high' 
-                          ? 'bg-red-100 text-red-600' 
-                          : 'bg-yellow-100 text-yellow-600'
-                      }`}>
-                        {rec.priority.toUpperCase()}
-                      </div>
-                      <span className="text-sm text-gray-500">{rec.category}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-xs text-gray-400">AI Pick</span>
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-semibold text-gray-900 mb-2">{rec.title}</h3>
-                  <p className="text-gray-600 text-sm mb-4 leading-relaxed">{rec.description}</p>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Lightbulb className="w-4 h-4 text-yellow-500" />
-                      <span className="text-sm font-medium text-gray-700">{rec.impact}</span>
-                    </div>
-                    <button className="flex items-center space-x-1 text-purple-600 hover:text-purple-800 text-sm font-medium group-hover:translate-x-1 transition-transform">
-                      <span>Learn More</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+          )}
+          {/* Initial message */}
+          {!aiReport && !isGenerating && !error && (
+            <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 mb-8 text-center text-gray-500">
+              Click <span className="font-semibold text-purple-600">Generate Report</span> to get your personalized AI-powered financial analysis.
             </div>
-          </div>
-
-          {/* Financial Health Score */}
-          <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl p-8 text-white">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">Financial Health Score</h2>
-                <p className="text-purple-100">Based on your spending patterns, savings rate, and financial goals</p>
-              </div>
-              <div className="text-right">
-                <div className="text-5xl font-bold mb-2">8.7</div>
-                <div className="text-purple-100">out of 10</div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold">53.8%</div>
-                <div className="text-purple-100 text-sm">Savings Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">95%</div>
-                <div className="text-purple-100 text-sm">Budget Adherence</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">6.2</div>
-                <div className="text-purple-100 text-sm">Months Emergency Fund</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">Low</div>
-                <div className="text-purple-100 text-sm">Financial Risk</div>
-              </div>
-            </div>
-
-            <div className="bg-white/20 rounded-xl p-4">
-              <p className="text-white/90 text-sm leading-relaxed">
-                🎉 <strong>Excellent financial health!</strong> You're saving well above average and maintaining good spending discipline. 
-                Focus on optimizing your investments and consider increasing your income streams for even better results.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

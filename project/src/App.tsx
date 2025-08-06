@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import Dashboard from './components/Dashboard';
@@ -7,30 +7,47 @@ import ExpensePage from './components/ExpensePage';
 import ReportsPage from './components/ReportsPage';
 import FilterPage from './components/FilterPage';
 import AIReportPage from './components/AIReportPage';
-import { User, mockUser } from './types/User';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
+import LoadingSpinner from './components/LoadingSpinner';
 
 export type AppPage = 'landing' | 'auth' | 'dashboard' | 'income' | 'expense' | 'reports' | 'filter' | 'ai-report';
 
-function App() {
+function AppContent() {
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState<AppPage>('landing');
-  const [user, setUser] = useState<User | null>(null);
-
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    setCurrentPage('dashboard');
-  };
 
   const handleLogout = () => {
-    setUser(null);
+    logout();
     setCurrentPage('landing');
   };
+
+  // Redirect based on authentication status
+  useEffect(() => {
+    if (loading) return; // Don't redirect while loading
+
+    if (isAuthenticated && user) {
+      setCurrentPage('dashboard');
+    } else {
+      setCurrentPage('landing');
+    }
+  }, [isAuthenticated, user, loading]);
+
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="large" text="Loading..." />
+      </div>
+    );
+  }
 
   const renderPage = () => {
     switch (currentPage) {
       case 'landing':
         return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
       case 'auth':
-        return <AuthPage onLogin={handleLogin} onBack={() => setCurrentPage('landing')} />;
+        return <AuthPage onBack={() => setCurrentPage('landing')} />;
       case 'dashboard':
         return <Dashboard user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
       case 'income':
@@ -52,6 +69,16 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       {renderPage()}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 
