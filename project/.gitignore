@@ -25,4 +25,4 @@ dist-ssr
 .env
 /node_modules/
 /server/node_modules/
-
+/src/components/AIReportPage.tsx
