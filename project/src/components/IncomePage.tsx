@@ -1,29 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import SlidingPanel from './SlidingPanel';
 import AddTransactionModal from './AddTransactionModal';
-import { User, mockFinancialData } from '../types/User';
+import { User } from '../types/User';
 import { AppPage } from '../App';
 import { TrendingUp, Plus, Calendar, Filter } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts";
-
-// Sample Data - replace with your own dynamic data
-const expenseData = [
-  { date: "2nd Jul", amount: 20000 },
-  { date: "3rd Jul", amount: 1200 },
-  { date: "4th Jul", amount: 1100 },
-  { date: "5th Jul", amount: 1300 },
-];
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { authService } from '../services/authService';
+import LoadingSpinner from './LoadingSpinner';
 
 interface IncomePageProps {
   user: User | null;
@@ -34,9 +18,23 @@ interface IncomePageProps {
 const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [income, setIncome] = useState<any[]>([]);
 
-  const incomeTransactions = mockFinancialData.transactions.filter(t => t.type === 'income');
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const incomeData = await authService.getIncome();
+        setIncome(incomeData);
+      } catch (e) {
+        setIncome([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -54,13 +52,13 @@ const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) =
     });
   };
 
-  // Monthly income data for chart
-  const monthlyIncomeData = mockFinancialData.monthlyData.map(d => ({
-    month: d.month,
-    amount: d.income
-  }));
+  const totalIncome = income.reduce((sum, t) => sum + (t.amount || 0), 0);
+  const monthlyIncomeData = [];
+  // You can aggregate monthly data here if needed
 
-  const maxMonthlyIncome = Math.max(...monthlyIncomeData.map(d => d.amount));
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><LoadingSpinner text="Loading..." /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -69,14 +67,12 @@ const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) =
         onMenuClick={() => setIsPanelOpen(true)} 
         onLogout={onLogout}
       />
-      
       <SlidingPanel 
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         onNavigate={onNavigate}
         currentPage="income"
       />
-
       <div className="pt-16 px-4 pb-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
@@ -93,7 +89,6 @@ const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) =
               <span>Add Income</span>
             </button>
           </div>
-
           {/* Income Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg">
@@ -104,59 +99,54 @@ const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) =
                 <span className="text-green-100 text-sm">This Month</span>
               </div>
               <p className="text-3xl font-bold mb-2">{formatCurrency(totalIncome)}</p>
-              <p className="text-green-100">+8.2% vs last month</p>
+              <p className="text-green-100">+0% vs last month</p>
             </div>
-
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
               <h3 className="text-gray-600 text-sm mb-2">Average Monthly</h3>
               <p className="text-2xl font-bold text-gray-900 mb-2">
-                {formatCurrency(monthlyIncomeData.reduce((sum, d) => sum + d.amount, 0) / monthlyIncomeData.length)}
+                {formatCurrency(totalIncome)}
               </p>
               <p className="text-green-600 text-sm">Consistent growth</p>
             </div>
-
             <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
               <h3 className="text-gray-600 text-sm mb-2">Income Sources</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-2">{incomeTransactions.length}</p>
+              <p className="text-2xl font-bold text-gray-900 mb-2">{income.length}</p>
               <p className="text-blue-600 text-sm">Active sources</p>
             </div>
           </div>
-
           {/* Income Chart */}
-         <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-8">
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="text-lg font-semibold text-gray-900">Expense Overview</h3>
-    <button className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-lg font-medium hover:bg-green-200 transition">
-      + Add Expense
-    </button>
-  </div>
-
-  {/* Chart */}
-  <ResponsiveContainer width="100%" height={300}>
-    <AreaChart data={expenseData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-      <defs>
-        <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.8} />
-          <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
-        </linearGradient>
-      </defs>
-      <XAxis dataKey="date" stroke="#888888" />
-      <YAxis stroke="#888888" />
-      <CartesianGrid strokeDasharray="3 3" />
-      <Tooltip />
-      <Area
-        type="monotone"
-        dataKey="amount"
-        stroke="#7c3aed"
-        fillOpacity={1}
-        fill="url(#colorExpense)"
-        dot={{ r: 5 }}
-        strokeWidth={3}
-      />
-    </AreaChart>
-  </ResponsiveContainer>
-</div>
-
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Income Overview</h3>
+              <button className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-lg font-medium hover:bg-green-200 transition">
+                + Add Income
+              </button>
+            </div>
+            {/* Chart - Placeholder, you can aggregate data for chart */}
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={income.map(i => ({ date: formatDate(i.date), amount: i.amount }))} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#888888" />
+                <YAxis stroke="#888888" />
+                <CartesianGrid strokeDasharray="3 3" />
+                <Tooltip />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#22c55e"
+                  fillOpacity={1}
+                  fill="url(#colorIncome)"
+                  dot={{ r: 5 }}
+                  strokeWidth={3}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
           {/* Income Transactions */}
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-6">
@@ -170,50 +160,60 @@ const IncomePage: React.FC<IncomePageProps> = ({ user, onNavigate, onLogout }) =
                 </button>
               </div>
             </div>
-
             <div className="space-y-4">
-              {incomeTransactions.map((transaction, index) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-gray-900">{transaction.category}</p>
-                        <p className="text-sm text-gray-500">{transaction.description}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-green-600">
-                          +{formatCurrency(transaction.amount)}
-                        </p>
-                        <div className="flex items-center space-x-1 text-gray-400">
-                          <Calendar className="w-3 h-3" />
-                          <span className="text-xs">{formatDate(transaction.date)}</span>
+              {income.length === 0 ? (
+                <div className="text-gray-500 text-center">No income data yet.</div>
+              ) : (
+                income.map((transaction, index) => (
+                  <div
+                    key={transaction._id || index}
+                    className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <div className="p-3 bg-green-100 rounded-xl">
+                      <TrendingUp className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-900">{transaction.category}</p>
+                          <p className="text-sm text-gray-500">{transaction.description}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-green-600">
+                            +{formatCurrency(transaction.amount)}
+                          </p>
+                          <div className="flex items-center space-x-1 text-gray-400">
+                            <Calendar className="w-3 h-3" />
+                            <span className="text-xs">{formatDate(transaction.date)}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
       </div>
-
       {/* Add Income Modal */}
       {showAddModal && (
         <AddTransactionModal
           type="income"
           onClose={() => setShowAddModal(false)}
-          onSubmit={(data) => {
-            console.log('Income data:', data);
-            setShowAddModal(false);
+          onSubmit={async (data) => {
+            try {
+              await authService.addIncome(data);
+              setShowAddModal(false);
+              setLoading(true);
+              const incomeData = await authService.getIncome();
+              setIncome(incomeData);
+            } catch (e) {
+              setShowAddModal(false);
+            } finally {
+              setLoading(false);
+            }
           }}
         />
       )}
