@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://expense-tracker-1-k631.onrender.com/api';
+const API_BASE_URL = "https://expense-tracker-1-k631.onrender.com/api";
 
 export interface AuthResponse {
   message: string;
