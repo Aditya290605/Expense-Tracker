@@ -323,7 +323,7 @@ const startServer = async () => {
     // Wait for MongoDB connection before starting server
     await connectDB();
     
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0",() => {
       console.log('🚀 Server started successfully!');
       console.log(`📍 Server running on: http://localhost:${PORT}`);
       console.log(`🔍 Health check: http://localhost:${PORT}/api/health`);
