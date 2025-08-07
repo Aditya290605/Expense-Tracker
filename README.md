@@ -8,7 +8,7 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)
 ![Made with Love](https://img.shields.io/badge/Made%20with-💙-red.svg)
 
-**[🚀 Live Demo](https://expense-tracker-frontend.vercel.app) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing) • [🌟 Star us on GitHub](#)**
+**[🚀 Live Demo](https://expense-tracker-nu-nine-96.vercel.app/)  • [🌟 Star us on GitHub](#)**
 
 *Transform your financial chaos into clarity with intelligent insights and beautiful analytics*
 
